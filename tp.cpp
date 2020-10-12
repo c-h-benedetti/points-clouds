@@ -29,6 +29,7 @@
 #include "src/Camera.h"
 #include "src/jmkdtree.h"
 
+#define EPSILON 0.00001
 
 BasicANNkdTree kdtree;
 
@@ -450,8 +451,6 @@ void init_points_set(double taille_cote, u_int size_pts_set, double shrink){
 
 // 0: Uniforme
 // 1: Gaussien
-// 2: Wendland
-// 3: Singulier
 
 void process_weights(double** weights, const ANNidxArray id_nearest_neighbors, const ANNdistArray square_distances_to_neighbors, uint8_t k_type, u_int knn, float radius = 1.0){
     *weights = new double [knn];
@@ -484,6 +483,10 @@ void projection(const Vec3& point, Vec3& p_point, u_int idx_neighbor, const std:
     p_point = (s * p_point) + ((1.0 - s) * p_point);
 }
 
+void projection(const Vec3& point, Vec3& p_point, const Vec3& p, const Vec3& n, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
+    p_point = point - (Vec3::dot(point - p, n)) * n;
+    p_point = (s * p_point) + ((1.0 - s) * p_point);
+}
 
 u_int centroid_and_normal(const double* poids, const std::vector< Vec3 >& projected_points, const std::vector<Vec3>& normals, u_int knn, Vec3& centroid, Vec3& normal, const ANNidxArray id_nearest_neighbors){
     centroid = Vec3(0.0, 0.0, 0.0);
@@ -545,6 +548,112 @@ u_int HPSS(Vec3 inputPoint, Vec3& outputPoint, Vec3& outputNormal, const std::ve
     return 0;
 }
 
+float* process_u_vector(const double* poids, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, u_int knn, const ANNidxArray id_nearest_neighbors){
+    float* u = new float[5];
+    double sum_weights = sum_array(poids, knn);
+    double n_weights[knn];
+
+    for(u_int i = 0 ; i < knn ; i++){
+        n_weights[i] = poids[i] / sum_weights;
+    }
+
+    // Morceaux du numérateur et du dénominateur de l'expression de u4
+    double n1 = 0.0;
+    Vec3 n2(0.0, 0.0, 0.0);
+    Vec3 n3(0.0, 0.0, 0.0);
+    double d1 = 0.0;
+    Vec3 d2(0.0, 0.0, 0.0);
+    Vec3 d3(0.0, 0.0, 0.0);
+
+    for(u_int i = 0 ; i < knn ; i++){
+        n1 += poids[i] * Vec3::dot(positions[id_nearest_neighbors[i]], normals[id_nearest_neighbors[i]]);
+        n2 += n_weights[i] * positions[id_nearest_neighbors[i]];
+        n3 += poids[i] * normals[id_nearest_neighbors[i]];
+        d1 += poids[i] + Vec3::dot(positions[id_nearest_neighbors[i]], positions[id_nearest_neighbors[i]]);
+        d2 += n_weights[i] * positions[id_nearest_neighbors[i]];
+        d3 += poids[i] * positions[id_nearest_neighbors[i]];
+    }
+
+    u[4] = 0.5 * ((n1 - Vec3::dot(n2, n3)) / (d1 - Vec3::dot(d2, d3)));
+
+    // Parties gauche et droite de l'expresion du vecteur [u1, u2, u3]
+    Vec3 g(0.0, 0.0, 0.0);
+    Vec3 d(0.0, 0.0, 0.0);
+
+    for(u_int i = 0 ; i < knn ; i++){
+        g += n_weights[i] * normals[id_nearest_neighbors[i]];
+        d += n_weights[i] * positions[id_nearest_neighbors[i]];
+    }
+
+    Vec3 u_123 = g - 2 * u[4] * d;
+    u[1] = u_123[0];
+    u[2] = u_123[1];
+    u[3] = u_123[2];
+
+    u[0] = (-1.0 * dot(u_123, d)) - (u[4] * d1);
+
+    return u;
+}
+
+void projection_algebrique(const Vec3& point, Vec3& p_point, const float* u, Vec& normale, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
+    if(abs(u[4]) < EPSILON){
+        Vec3 p(0.0, 0.0, 0.0);
+        Vec3 n(u[1], u[2], u[3]);
+        projection(point, p_point, p, n, positions, normals); // idx neighbor ???
+    }
+    else{
+        Vec3 c = (-1.0 * Vec3(u[1], u[2], u[3])) / (2.0 * u[4])
+        float r = sqrt(pow(c.length(), 2) - (u[0]/u[4]));
+        Vec3 CP = Vec3:normalize(point - c);
+        p_point = r * CP;
+    }
+    normale = Vec3::normalize(Vec3(u[1], u[2], u[3]) + (2 * u[4] * point));
+}
+
+u_int APSS(Vec3 inputPoint, Vec3& outputPoint, Vec3& outputNormal, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, const BasicANNkdTree& kdtree, uint8_t kernel_type, float radius, u_int nb_iterations=10, u_int knn=20){
+    Vec3 x_k = inputPoint;
+
+    for(u_int i = 0 ; i < nb_iterations ; i++){
+
+        ANNidxArray id_nearest_neighbors = new ANNidx[knn];
+        ANNdistArray square_distances_to_neighbors = new ANNdist[knn];
+        Vec3 projected_point, normal;
+        double* poids = NULL;
+
+        // 1. Récupération des K-nearest-neighbors:
+        kdtree.knearest(x_k, knn, id_nearest_neighbors, square_distances_to_neighbors);
+
+        // 2. Calcul des poids en fonction du type
+        process_weights(&poids, id_nearest_neighbors, square_distances_to_neighbors, kernel_type, knn, radius);
+
+        // 3. Calcul du vecteur u (pour la sphère algébrique)
+        float* u = process_u_vector(poids, positions, normals, knn, id_nearest_neighbors);
+
+        // 4. Calcul du projeté du point d'entrée sur la sphère (ou le plan)
+        projection_algebrique(x_k, projected_point, u, normal, positions, normals);
+
+        for(u_int j = 0 ; j < knn ; j++){
+            Vec3 projected_point;
+            projection(x_k, projected_point, id_nearest_neighbors[j], positions, normals);
+            projected_points.push_back(projected_point);
+        }
+
+        u_int res = centroid_and_normal(poids, projected_points, normals, knn, centroid, normal, id_nearest_neighbors);
+        if(res){return 1;} // Ne passe ici qu'en cas de division par 0 avec les poids
+
+        // 6. Refresh des valeurs avant nouvelle itération
+        outputPoint = centroid;
+        x_k = centroid;
+        outputNormal = normal;
+
+        delete [] u;
+        delete [] poids;
+        delete [] id_nearest_neighbors;
+        delete [] square_distances_to_neighbors;
+    }
+    return 0;
+}
+
 void noisify(){
     positions2 = output_fonction;
 
@@ -574,6 +683,7 @@ void launch_hpss(const BasicANNkdTree& kdtree, float k_size){
     std::cout << borne << " points projetés.  |  " << output_fonction.size() << " correctements projetés  |  Kernel_size = " << k_size << std::endl;
 }
 
+
 int main (int argc, char ** argv) {
     if (argc > 2) {
         exit (EXIT_FAILURE);
@@ -596,6 +706,16 @@ int main (int argc, char ** argv) {
     std::cout << "[M/P] : Diminuer/Augmenter la taille du kernel" << std::endl;
     std::cout << "[K/I] : Diminuer/Augmenter le nombre de points projetés" << std::endl;
     std::cout << "[J/U] : Diminuer/Augmenter le bruit le long des normales" << std::endl;
+
+    Vec3 v = Vec3(0, 1, 2);
+    std::cout << v << std::endl;
+    Mat3 m(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    std::cout << m << std::endl;
+    Mat3 m2(v,Vec3(0, 0, 0),Vec3(0, 0, 0));
+    m2.transpose();
+    std::cout << m2 << std::endl;
+    float k = 3.0 * Vec3(1, 2, 3) * Vec3(4, 5, 6);
+    std::cout << k << std::endl;
 
     {
         // Load a first pointset, and build a kd-tree:

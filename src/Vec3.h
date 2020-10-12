@@ -120,6 +120,19 @@ public:
         vals[7] = 0;
         vals[8] = 0;
     }
+
+    Mat3(const Vec3& v1, const Vec3& v2, const Vec3& v3){
+        vals[0] = v1[0];
+        vals[1] = v1[1];
+        vals[2] = v1[2];
+        vals[3] = v2[0];
+        vals[4] = v2[1];
+        vals[5] = v2[2];
+        vals[6] = v3[0];
+        vals[7] = v3[1];
+        vals[8] = v3[2];
+    }
+
     Mat3( float v1 , float v2 , float v3 , float v4 , float v5 , float v6 , float v7 , float v8 , float v9)
     {
         vals[0] = v1;
