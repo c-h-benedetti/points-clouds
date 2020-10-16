@@ -29,7 +29,7 @@
 #include "src/Camera.h"
 #include "src/jmkdtree.h"
 
-#define EPSILON 0.00001
+#define EPSILON 0.0001
 
 BasicANNkdTree kdtree;
 
@@ -46,7 +46,13 @@ bool original = true;
 bool normals_disp = false;
 float kernel_radius = 1.0;
 
-u_int nb_pts_proj = 20000;
+u_int nb_pts_proj = 5000;
+
+bool hpss_or_apss = false;
+u_int nb_iters = 10;
+
+u_int k_type = 1;
+u_int nb_vois = 10;
 
 // -------------------------------------------
 // OpenGL/GLUT application code.
@@ -281,6 +287,7 @@ void idle () {
 
 void init_points_set(double taille_cote, u_int size_pts_set, double shrink=1.0);
 void launch_hpss(const BasicANNkdTree& kdtree, float k_size = 1.0);
+void launch_apss(const BasicANNkdTree& kdtree, float k_size = 1.0);
 void noisify();
 
 void key (unsigned char keyPressed, int x, int y) {
@@ -315,28 +322,28 @@ void key (unsigned char keyPressed, int x, int y) {
         case 'p':
             kernel_radius += 0.05;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            launch_hpss(kdtree, kernel_radius);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
             break;
 
         case 'm':
             kernel_radius -= 0.05;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            launch_hpss(kdtree, kernel_radius);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
             break;
 
         case 'i':
             nb_pts_proj += 10;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            launch_hpss(kdtree, kernel_radius);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
             break;
 
         case 'k':
             nb_pts_proj -= 10;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            launch_hpss(kdtree, kernel_radius);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
             break;
 
@@ -350,8 +357,64 @@ void key (unsigned char keyPressed, int x, int y) {
             noisify();
             break;
 
+        case 'a':
+            hpss_or_apss = false;
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case 'h':
+            hpss_or_apss = true;
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case '-':
+            nb_iters = (nb_iters - 10 > 0) ? (nb_iters - 10) : (0);
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case '+':
+            nb_iters += 10;
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case 'q':
+            nb_vois = (nb_vois - 5 > 0) ? (nb_iters - 5) : (0);
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case 's':
+            nb_vois += 5;
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case '0':
+            k_type = 0;
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
+
+        case '1':
+            k_type = 1;
+            init_points_set(2.0, nb_pts_proj, 0.8);
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            noisify();
+            break;
 
         default:
+            printf("%d  %c\n", keyPressed, keyPressed);
             break;
     }
     idle ();
@@ -483,10 +546,10 @@ void projection(const Vec3& point, Vec3& p_point, u_int idx_neighbor, const std:
     p_point = (s * p_point) + ((1.0 - s) * p_point);
 }
 
-void projection(const Vec3& point, Vec3& p_point, const Vec3& p, const Vec3& n, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
+/*void projection(const Vec3& point, Vec3& p_point, const Vec3& p, const Vec3& n, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
     p_point = point - (Vec3::dot(point - p, n)) * n;
     p_point = (s * p_point) + ((1.0 - s) * p_point);
-}
+}*/
 
 u_int centroid_and_normal(const double* poids, const std::vector< Vec3 >& projected_points, const std::vector<Vec3>& normals, u_int knn, Vec3& centroid, Vec3& normal, const ANNidxArray id_nearest_neighbors){
     centroid = Vec3(0.0, 0.0, 0.0);
@@ -569,7 +632,7 @@ float* process_u_vector(const double* poids, const std::vector<Vec3>& positions,
         n1 += poids[i] * Vec3::dot(positions[id_nearest_neighbors[i]], normals[id_nearest_neighbors[i]]);
         n2 += n_weights[i] * positions[id_nearest_neighbors[i]];
         n3 += poids[i] * normals[id_nearest_neighbors[i]];
-        d1 += poids[i] + Vec3::dot(positions[id_nearest_neighbors[i]], positions[id_nearest_neighbors[i]]);
+        d1 += poids[i] * Vec3::dot(positions[id_nearest_neighbors[i]], positions[id_nearest_neighbors[i]]);
         d2 += n_weights[i] * positions[id_nearest_neighbors[i]];
         d3 += poids[i] * positions[id_nearest_neighbors[i]];
     }
@@ -579,10 +642,12 @@ float* process_u_vector(const double* poids, const std::vector<Vec3>& positions,
     // Parties gauche et droite de l'expresion du vecteur [u1, u2, u3]
     Vec3 g(0.0, 0.0, 0.0);
     Vec3 d(0.0, 0.0, 0.0);
+    float d_u0 = 0.0;
 
     for(u_int i = 0 ; i < knn ; i++){
         g += n_weights[i] * normals[id_nearest_neighbors[i]];
         d += n_weights[i] * positions[id_nearest_neighbors[i]];
+        d_u0 += n_weights[i] * Vec3::dot(positions[id_nearest_neighbors[i]], positions[id_nearest_neighbors[i]]);
     }
 
     Vec3 u_123 = g - 2 * u[4] * d;
@@ -590,24 +655,28 @@ float* process_u_vector(const double* poids, const std::vector<Vec3>& positions,
     u[2] = u_123[1];
     u[3] = u_123[2];
 
-    u[0] = (-1.0 * dot(u_123, d)) - (u[4] * d1);
+    u[0] = (-1.0 * Vec3::dot(u_123, d)) - (u[4] * d_u0);
 
     return u;
 }
 
-void projection_algebrique(const Vec3& point, Vec3& p_point, const float* u, Vec& normale, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
+void projection_algebrique(const Vec3& point, Vec3& p_point, const float* u, Vec3& normale, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
     if(abs(u[4]) < EPSILON){
-        Vec3 p(0.0, 0.0, 0.0);
+        //Vec3 p(0.0, 0.0, 0.0);
+        p_point = point;
         Vec3 n(u[1], u[2], u[3]);
-        projection(point, p_point, p, n, positions, normals); // idx neighbor ???
+        //projection(point, p_point, p, n, positions, normals); // idx neighbor ???
     }
     else{
-        Vec3 c = (-1.0 * Vec3(u[1], u[2], u[3])) / (2.0 * u[4])
+        Vec3 c = (-1.0 * Vec3(u[1], u[2], u[3])) / (2.0 * u[4]);
         float r = sqrt(pow(c.length(), 2) - (u[0]/u[4]));
-        Vec3 CP = Vec3:normalize(point - c);
-        p_point = r * CP;
+        Vec3 CP = point - c;
+        CP.normalize();
+        p_point = c + r * CP;
+        normale = Vec3(u[1], u[2], u[3]) + (2 * u[4] * point);
+        normale.normalize();
     }
-    normale = Vec3::normalize(Vec3(u[1], u[2], u[3]) + (2 * u[4] * point));
+
 }
 
 u_int APSS(Vec3 inputPoint, Vec3& outputPoint, Vec3& outputNormal, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, const BasicANNkdTree& kdtree, uint8_t kernel_type, float radius, u_int nb_iterations=10, u_int knn=20){
@@ -617,7 +686,7 @@ u_int APSS(Vec3 inputPoint, Vec3& outputPoint, Vec3& outputNormal, const std::ve
 
         ANNidxArray id_nearest_neighbors = new ANNidx[knn];
         ANNdistArray square_distances_to_neighbors = new ANNdist[knn];
-        Vec3 projected_point, normal;
+        Vec3 projected_point(0.0, 0.0, 0.0), normal(0.0, 0.0, 0.0);
         double* poids = NULL;
 
         // 1. Récupération des K-nearest-neighbors:
@@ -632,18 +701,9 @@ u_int APSS(Vec3 inputPoint, Vec3& outputPoint, Vec3& outputNormal, const std::ve
         // 4. Calcul du projeté du point d'entrée sur la sphère (ou le plan)
         projection_algebrique(x_k, projected_point, u, normal, positions, normals);
 
-        for(u_int j = 0 ; j < knn ; j++){
-            Vec3 projected_point;
-            projection(x_k, projected_point, id_nearest_neighbors[j], positions, normals);
-            projected_points.push_back(projected_point);
-        }
-
-        u_int res = centroid_and_normal(poids, projected_points, normals, knn, centroid, normal, id_nearest_neighbors);
-        if(res){return 1;} // Ne passe ici qu'en cas de division par 0 avec les poids
-
-        // 6. Refresh des valeurs avant nouvelle itération
-        outputPoint = centroid;
-        x_k = centroid;
+        // 5. Refresh des valeurs avant nouvelle itération
+        outputPoint = projected_point;
+        x_k = projected_point;
         outputNormal = normal;
 
         delete [] u;
@@ -665,14 +725,16 @@ void noisify(){
     }
 }
 
+
 void launch_hpss(const BasicANNkdTree& kdtree, float k_size){
     u_int borne = positions2.size();
-
+    std::cout << std::endl;
     for(u_int i = 0 ; i < borne ; i++){
         Vec3 point, normal;
-        u_int success = HPSS(positions2[0], point, normal, positions, normals, kdtree, 1, k_size);
+        u_int success = HPSS(positions2[0], point, normal, positions, normals, kdtree, k_type, k_size, nb_iters, nb_vois);
         positions2.erase(positions2.begin()+0);
         normals2.erase(normals2.begin()+0);
+        if(i % 100 == 0)std::cerr << "\r" << "[" << (((float)i/(float)borne)*100.0) << "%] recalculés                   ";
 
         if(!success){
             output_fonction.push_back(point);
@@ -680,13 +742,75 @@ void launch_hpss(const BasicANNkdTree& kdtree, float k_size){
             normals2.push_back(normal);
         }
     }
-    std::cout << borne << " points projetés.  |  " << output_fonction.size() << " correctements projetés  |  Kernel_size = " << k_size << std::endl;
+    std::cout << std::endl;
+    std::cout << "HPSS: " << borne << " points projetés.  |  " << output_fonction.size() << " correctements projetés  |  Kernel_size = " << k_size << "  |  Nb itererations: " << nb_iters << "  |  Nb voisins: " << nb_vois << std::endl;
+}
+
+
+void launch_apss(const BasicANNkdTree& kdtree, float k_size){
+    u_int borne = positions2.size();
+    std::cout << std::endl;
+    for(u_int i = 0 ; i < borne ; i++){
+        Vec3 point, normal;
+        u_int success = APSS(positions2[0], point, normal, positions, normals, kdtree, k_type, k_size, nb_iters, nb_vois);
+        positions2.erase(positions2.begin()+0);
+        normals2.erase(normals2.begin()+0);
+        if(i % 100 == 0)std::cerr << "\r" << "[" << (((float)i/(float)borne)*100.0) << "%] recalculés                   ";
+
+        if(!success){
+            output_fonction.push_back(point);
+            //positions2.push_back(point);
+            normals2.push_back(normal);
+        }
+    }
+    std::cout << std::endl;
+    std::cout << "APSS: " << borne << " points projetés.  |  " << output_fonction.size() << " correctements projetés  |  Kernel_size = " << k_size << "  |  Nb itererations: " << nb_iters << "  |  Nb voisins: " << nb_vois << std::endl;
 }
 
 
 int main (int argc, char ** argv) {
     if (argc > 2) {
-        exit (EXIT_FAILURE);
+        for(int i = 1 ; i < argc ; i+=2){
+            if(argv[i][1] == 'h'){
+                std::cout << "-h: Help" << std::endl;
+                std::cout << "-i: Nombre d'iterations. Values: int" << std::endl;
+                std::cout << "-k: Type de kernel. Values: UNI|GAUSS" << std::endl;
+                std::cout << "-s: Taille kernel. Values: float" << std::endl;
+                std::cout << "-t: Type de projection. Values: HPSS|APSS" << std::endl;
+                std::cout << "-p: Number of projected points. Values: int" << std::endl;
+                std::cout << "-n: Number of neighbours for projection. Values: int" << std::endl;
+                return 0;
+            }
+            if(argv[i][1] == 'i'){
+                nb_iters = atoi(argv[i+1]);
+            }
+            if(argv[i][1] == 'k'){
+                if(strcmp(argv[i+1], "GAUSS") == 0){
+                    k_type = 1;
+                }
+                if(strcmp(argv[i+1], "UNI") == 0){
+                    k_type = 0;
+                }
+            }
+            if(argv[i][1] == 's'){
+                kernel_radius = atof(argv[i+1]);
+            }
+            if(argv[i][1] == 't'){
+                if(strcmp(argv[i+1], "HPSS") == 0){
+                    hpss_or_apss = true;
+                }
+                if(strcmp(argv[i+1], "APSS") == 0){
+                    hpss_or_apss = false;
+                }
+            }
+            if(argv[i][1] == 'p'){
+                nb_pts_proj = atoi(argv[i+1]);
+            }
+            if(argv[i][1] == 'n'){
+                nb_vois = atoi(argv[i+1]);
+            }
+
+        }
     }
     glutInit (&argc, argv);
     glutInitDisplayMode (GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE);
@@ -701,21 +825,22 @@ int main (int argc, char ** argv) {
     glutMotionFunc (motion);
     glutMouseFunc (mouse);
     key ('?', 0, 0);
-    std::cout << "[O] : Afficher/masquer points d'origines" << std::endl;
-    std::cout << "[N] : Afficher/masquer couleurs d'après normales" << std::endl;
+    std::cout << std::endl << std::endl;
+    std::cout << "#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#" << std::endl;
+    std::cout << "#                     CONTROLES CLAVIER                             #" << std::endl;
+    std::cout << "#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#" << std::endl << std::endl;
+    std::cout << "[O]   : Afficher/masquer points d'origines" << std::endl;
+    std::cout << "[N]   : Afficher/masquer couleurs d'après normales" << std::endl;
     std::cout << "[M/P] : Diminuer/Augmenter la taille du kernel" << std::endl;
     std::cout << "[K/I] : Diminuer/Augmenter le nombre de points projetés" << std::endl;
     std::cout << "[J/U] : Diminuer/Augmenter le bruit le long des normales" << std::endl;
+    std::cout << "[Q/S] : Diminuer/Augmenter le nombre de voisins prit en compte" << std::endl;
+    std::cout << "[A/H] : APSS ou HPSS" << std::endl;
+    std::cout << "[0]   : Kernel non-pondéré" << std::endl;
+    std::cout << "[1]   : Kernel Gaussien" << std::endl;
+    std::cout << "[-/+] : Diminuer/Augmenter le nombre d'itérations" << std::endl << std::endl << std::endl;
+    std::cout << "#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#" << std::endl << std::endl;
 
-    Vec3 v = Vec3(0, 1, 2);
-    std::cout << v << std::endl;
-    Mat3 m(1, 2, 3, 4, 5, 6, 7, 8, 9);
-    std::cout << m << std::endl;
-    Mat3 m2(v,Vec3(0, 0, 0),Vec3(0, 0, 0));
-    m2.transpose();
-    std::cout << m2 << std::endl;
-    float k = 3.0 * Vec3(1, 2, 3) * Vec3(4, 5, 6);
-    std::cout << k << std::endl;
 
     {
         // Load a first pointset, and build a kd-tree:
@@ -724,7 +849,7 @@ int main (int argc, char ** argv) {
 
         // Create a second pointset that is artificial, and project it on pointset1 using MLS techniques:
         init_points_set(2.0, nb_pts_proj, 0.8);
-        launch_hpss(kdtree, kernel_radius);
+        if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
         noisify();
     }
 
