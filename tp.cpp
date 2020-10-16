@@ -36,6 +36,9 @@ BasicANNkdTree kdtree;
 std::vector< Vec3 > positions;
 std::vector< Vec3 > normals;
 
+std::vector< Vec3 > save_positions;
+std::vector< Vec3 > save_normals;
+
 std::vector< Vec3 > positions2; // Output final, après HPSS et bruit
 std::vector< Vec3 > output_fonction; // Output HPSS
 std::vector< Vec3 > normals2;
@@ -288,6 +291,7 @@ void idle () {
 void init_points_set(double taille_cote, u_int size_pts_set, double shrink=1.0);
 void launch_hpss(const BasicANNkdTree& kdtree, float k_size = 1.0);
 void launch_apss(const BasicANNkdTree& kdtree, float k_size = 1.0);
+void export_vector();
 void noisify();
 
 void key (unsigned char keyPressed, int x, int y) {
@@ -322,99 +326,117 @@ void key (unsigned char keyPressed, int x, int y) {
         case 'p':
             kernel_radius += 0.05;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'm':
             kernel_radius -= 0.05;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'i':
             nb_pts_proj += 10;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'k':
             nb_pts_proj -= 10;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'u':
             noise += 0.005;
+            init_points_set(2.0, nb_pts_proj, 0.8);
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'j':
             noise = (noise >= 0.005) ? (noise - 0.005) : (0.0);
+            init_points_set(2.0, nb_pts_proj, 0.8);
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'a':
             hpss_or_apss = false;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'h':
             hpss_or_apss = true;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case '-':
             nb_iters = (nb_iters - 10 > 0) ? (nb_iters - 10) : (0);
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case '+':
             nb_iters += 10;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 'q':
             nb_vois = (nb_vois - 5 > 0) ? (nb_iters - 5) : (0);
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case 's':
             nb_vois += 5;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case '0':
             k_type = 0;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         case '1':
             k_type = 1;
             init_points_set(2.0, nb_pts_proj, 0.8);
-            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
             noisify();
+            if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+            export_vector();
             break;
 
         default:
-            printf("%d  %c\n", keyPressed, keyPressed);
+            printf("Unknown key [%d: '%c']. Be sure caps lock is off\n", keyPressed, keyPressed);
             break;
     }
     idle ();
@@ -714,14 +736,26 @@ u_int APSS(Vec3 inputPoint, Vec3& outputPoint, Vec3& outputNormal, const std::ve
     return 0;
 }
 
-void noisify(){
+void export_vector(){
     positions2 = output_fonction;
+}
 
-    for(u_int i = 0 ; i < positions2.size() ; i++){
-        float magnitude = (float)(rand())/(float)(RAND_MAX);
-        magnitude *= (2.0 * noise);
-        magnitude -= noise;
-        positions2[i] += (magnitude * normals2[i]);
+
+void noisify(){
+    positions = save_positions;
+    normals = save_normals;
+    if(noise <= 0){
+        std::cout << "Bruit: 0.0" << std::endl;
+    }else{
+        std::cout << "Bruit: [-" << noise << ";" << noise << "]" << std::endl;
+    }
+    if(noise > 0.0){
+        for(u_int i = 0 ; i < positions.size() ; i++){
+            float magnitude = (float)(rand())/(float)(RAND_MAX);
+            magnitude *= (2.0 * noise);
+            magnitude -= noise;
+            positions[i] += (magnitude * normals[i]);
+        }
     }
 }
 
@@ -845,12 +879,15 @@ int main (int argc, char ** argv) {
     {
         // Load a first pointset, and build a kd-tree:
         loadPN("pointsets/igea.pn" , positions , normals);
+        save_positions = positions;
+        save_normals = normals;
         kdtree.build(positions);
 
         // Create a second pointset that is artificial, and project it on pointset1 using MLS techniques:
         init_points_set(2.0, nb_pts_proj, 0.8);
-        if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
         noisify();
+        if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
+        export_vector();
     }
 
 
