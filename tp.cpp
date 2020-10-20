@@ -39,7 +39,7 @@ std::vector< Vec3 > normals;
 std::vector< Vec3 > save_positions;
 std::vector< Vec3 > save_normals;
 
-std::vector< Vec3 > positions2; // Output final, après HPSS et bruit
+std::vector< Vec3 > positions2; // Output final
 std::vector< Vec3 > output_fonction; // Output HPSS
 std::vector< Vec3 > normals2;
 
@@ -340,7 +340,7 @@ void key (unsigned char keyPressed, int x, int y) {
             break;
 
         case 'i':
-            nb_pts_proj += 10;
+            nb_pts_proj += 1000;
             init_points_set(2.0, nb_pts_proj, 0.8);
             noisify();
             if(hpss_or_apss){launch_hpss(kdtree, kernel_radius);}else{launch_apss(kdtree, kernel_radius);}
@@ -682,6 +682,7 @@ float* process_u_vector(const double* poids, const std::vector<Vec3>& positions,
     return u;
 }
 
+
 void projection_algebrique(const Vec3& point, Vec3& p_point, const float* u, Vec3& normale, const std::vector<Vec3>& positions, const std::vector<Vec3>& normals, double s = 0.5){
     if(abs(u[4]) < EPSILON){
         //Vec3 p(0.0, 0.0, 0.0);
@@ -802,8 +803,9 @@ void launch_apss(const BasicANNkdTree& kdtree, float k_size){
 }
 
 
+
 int main (int argc, char ** argv) {
-    if (argc > 2) {
+    if (argc >= 2) {
         for(int i = 1 ; i < argc ; i+=2){
             if(argv[i][1] == 'h'){
                 std::cout << "-h: Help" << std::endl;
